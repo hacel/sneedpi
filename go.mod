@@ -1,4 +1,4 @@
-module gitub.com/hacel/sneedpi
+module github.com/hacel/sneedpi
 
 go 1.22.3
 
