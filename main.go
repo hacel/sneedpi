@@ -30,19 +30,23 @@ func transfer(to io.WriteCloser, from io.ReadCloser) {
 
 func handleTunneling(w http.ResponseWriter, r *http.Request) {
 	logger := log.With().Str("hostname", r.URL.Hostname()).Logger()
-	// Host look up over DoH
-	a, _, err := resolver.LookupA(r.URL.Hostname())
-	if err != nil {
-		logger.Error().Err(err).Msg("")
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	addr := r.URL.Hostname()
+	if resolver != nil {
+		// Host look up over DoH
+		a, _, err := resolver.LookupA(r.URL.Hostname())
+		if err != nil {
+			logger.Error().Err(err).Msg("")
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		addr = a[0].IP4
 	}
 	// Dial remote
 	port := "443"
 	if r.URL.Port() != "" {
 		port = r.URL.Port()
 	}
-	addr := a[0].IP4 + ":" + port
+	addr = addr + ":" + port
 	logger = logger.With().Str("address", addr).Logger()
 	logger.Info().Msg("dialing...")
 	remote_conn, err := net.DialTimeout("tcp4", addr, 10*time.Second)
@@ -102,7 +106,7 @@ func handleTunneling(w http.ResponseWriter, r *http.Request) {
 func main() {
 	ip := pflag.String("ip", "127.0.0.1", "IP")
 	port := pflag.String("port", "8080", "Port")
-	dns := pflag.String("dns", "1.1.1.1", "DNS server")
+	dns := pflag.String("dns", "", "DoH compatible DNS server")
 	pflag.Parse()
 
 	// Setup logger
@@ -110,10 +114,12 @@ func main() {
 	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	// Setup DoH resolver
-	resolver = &doh.Resolver{
-		Host:  *dns,
-		Class: doh.IN,
+	if *dns != "" {
+		// Setup DoH resolver
+		resolver = &doh.Resolver{
+			Host:  *dns,
+			Class: doh.IN,
+		}
 	}
 
 	server := &http.Server{
