@@ -106,7 +106,7 @@ func handleTunneling(w http.ResponseWriter, r *http.Request) {
 func main() {
 	ip := pflag.String("ip", "127.0.0.1", "IP")
 	port := pflag.String("port", "8080", "Port")
-	dns := pflag.String("dns", "", "DoH compatible DNS server")
+	dns := pflag.String("dns", "", "Resolve addresses using DoH compatible DNS server")
 	pflag.Parse()
 
 	// Setup logger
@@ -152,6 +152,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		defer stop()
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Error().Str("ip", *ip).Str("port", *port).Str("dns", *dns).Err(err).Msg("")
 		}
